@@ -1,6 +1,8 @@
 # Bun
 bun.lockb
-
+db/*
+.sqlite3
+media/*
 # Dependencies
 node_modules/
 
@@ -53,4 +55,3 @@ coverage/
 *.tmp
 tmp/
 temp/
-

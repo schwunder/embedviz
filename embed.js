@@ -24,4 +24,4 @@ const response = await fetch(
   options
 );
 const data = await response.json();
-console.log(data.google.items[0]);
+console.log(data?.google?.items[0]?.embedding);
