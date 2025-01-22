@@ -1,27 +1,25 @@
-//from env get key
-const apiKey = process.env.EDEN_API_KEY;
+export async function getEmbedding(fileUrl, apiKey, apiEndpoint) {
+  const options = {
+    method: "POST",
+    headers: {
+      accept: "application/json",
+      "content-type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      response_as_dict: true,
+      attributes_as_list: false,
+      show_base_64: true,
+      show_original_response: false,
+      representation: "document",
+      providers: ["google"],
+      file_url: fileUrl,
+    }),
+  };
 
-const options = {
-  method: "POST",
-  headers: {
-    accept: "application/json",
-    "content-type": "application/json",
-    Authorization: `Bearer ${apiKey}`,
-  },
-  body: JSON.stringify({
-    response_as_dict: true,
-    attributes_as_list: false,
-    show_base_64: true,
-    show_original_response: false,
-    representation: "document",
-    providers: ["google"],
-    file_url: "https://markusstrasser.org/images/fineart_collage2.jpg",
-  }),
-};
-
-const response = await fetch(
-  "https://api.edenai.run/v2/image/embeddings",
-  options
-);
-const data = await response.json();
-console.log(data?.google?.items[0]?.embedding);
+  const response = await fetch(apiEndpoint, options);
+  const data = await response.json();
+  const embedding = data?.google?.items[0]?.embedding;
+  if (!embedding) return null;
+  return new Float32Array(embedding);
+}

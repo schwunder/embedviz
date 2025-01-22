@@ -27,16 +27,4 @@ function retrieveEmbedding(id) {
   return new Float32Array(new Uint8Array(result.embedding).buffer);
 }
 
-// Test the functions
-const sampleEmbedding = new Float32Array([0.1, 0.2, 0.3, 0.4, 0.6]);
-const id = storeEmbedding(sampleEmbedding);
-console.error("Stored embedding with id:", id);
-
-const retrievedEmbedding = retrieveEmbedding(id);
-if (retrievedEmbedding) {
-  console.error("Retrieved embedding:", Array.from(retrievedEmbedding));
-} else {
-  console.error("No data found in database");
-}
-
 export { storeEmbedding, retrieveEmbedding };
