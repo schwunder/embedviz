@@ -8,7 +8,7 @@ db/*
 media/*
 # Dependencies
 node_modules/
-
+embeddings.sqlite
 # Build outputs
 dist/
 build/
