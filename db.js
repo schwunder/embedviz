@@ -27,4 +27,8 @@ function retrieveEmbedding(id) {
   return new Float32Array(new Uint8Array(result.embedding).buffer);
 }
 
-export { storeEmbedding, retrieveEmbedding };
+function clearEmbeddings() {
+  db.query("DELETE FROM embeddings").run();
+}
+
+export { storeEmbedding, retrieveEmbedding, clearEmbeddings };
