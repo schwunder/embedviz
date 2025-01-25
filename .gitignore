@@ -6,6 +6,7 @@ db/*
 .sqlite-shm
 .sqlite-wal
 media/*
+datasets/*
 # Dependencies
 node_modules/
 embeddings.sqlite
