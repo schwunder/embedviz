@@ -29,3 +29,12 @@ export async function getLocalEmbedding(imagePath, apiKey, apiEndpoint) {
         return null;
     }
 }
+
+export async function getBatchLocalEmbedding(imagePaths, apiKey, apiEndpoint) {
+    const embeddings = [];
+    for (const imagePath of imagePaths) {
+        const embedding = await getLocalEmbedding(imagePath, apiKey, apiEndpoint);
+        embeddings.push(embedding);
+    }
+    return embeddings;
+}
