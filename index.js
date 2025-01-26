@@ -1,5 +1,5 @@
 import { getEmbedding } from "./embed.js";
-import { storeEmbedding, retrieveEmbedding } from "./db.js";
+import { storeEmbedding, retrieveEmbedding, clearEmbeddings } from "./db.js";
 
 const embeddingMap = {};
 
@@ -14,6 +14,7 @@ async function main() {
   }
 
   try {
+    clearEmbeddings();
     const embedding = await getEmbedding(FILE_URL, apiKey, API_ENDPOINT);
     console.log("Embedding:", embedding);
     const id = storeEmbedding(embedding);
