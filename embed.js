@@ -17,9 +17,14 @@ export async function getEmbedding(fileUrl, apiKey, apiEndpoint) {
     }),
   };
 
-  const response = await fetch(apiEndpoint, options);
-  const data = await response.json();
-  const embedding = data?.google?.items[0]?.embedding;
-  if (!embedding) return null;
-  return new Float32Array(embedding);
+  try {
+    const response = await fetch(apiEndpoint, options);
+    const data = await response.json();
+    const embedding = data?.google?.items[0]?.embedding;
+    if (!embedding) return null;
+    return new Float32Array(embedding);
+  } catch (error) {
+    console.error('Error fetching embedding:', error);
+    return null;
+  }
 }
