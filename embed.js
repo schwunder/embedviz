@@ -1,7 +1,5 @@
 import fs from 'fs';
 import axios from 'axios';
-import URL from 'url';
-import {isAbsolute} from 'path';
 
 const createApiCallForm = (imagePath) => {
     const form = new FormData();
@@ -17,20 +15,13 @@ const createApiCallForm = (imagePath) => {
     return form;
 }
 
-const createOptions = (apiKey, fileUrl, local) => {
-  const headers = {
-    accept: "application/json",
-    Authorization: `Bearer ${apiKey}`,
-  };
+const createOptions = (apiKey, fileUrl) => {
+  const headers = { accept: "application/json", Authorization: `Bearer ${apiKey}` };
+  const isRemote = (() => { try { return new URL(fileUrl).protocol.startsWith('http') } catch { return false } })();
+  if (isRemote) headers["content-type"] = "application/json";
 
-  if (!local) {
-    headers["content-type"] = "application/json";
-  }
-
-  const body =
-    local
-    ? createApiCallForm(fileUrl)
-    : JSON.stringify({
+  const body = isRemote
+    ? JSON.stringify({
         response_as_dict: true,
         attributes_as_list: false,
         show_base_64: true,
@@ -38,14 +29,14 @@ const createOptions = (apiKey, fileUrl, local) => {
         representation: "document",
         providers: ["google"],
         file_url: fileUrl,
-      });
+      })
+    : createApiCallForm(fileUrl);
 
   return { method: "POST", headers, body };
 }
 
-
-export const getEmbedding = async (fileUrl, apiKey, apiEndpoint, local) => {
-  const options = createOptions(apiKey, fileUrl, local);
+export const getEmbedding = async (fileUrl, apiKey, apiEndpoint) => {
+  const options = createOptions(apiKey, fileUrl);
 
   try {
     const response = await fetch(apiEndpoint, options);
@@ -60,21 +51,20 @@ export const getEmbedding = async (fileUrl, apiKey, apiEndpoint, local) => {
 
 export const getEmbeddingBatch = async (imagePaths, apiKey, apiEndpoint) => {
     const embeddings = [];
+    
     for (const imagePath of imagePaths) {
         try {
-            const embedding = await getEmbedding(imagePath, apiKey, apiEndpoint, false);
+            const embedding = await getEmbedding(imagePath, apiKey, apiEndpoint);
             if (embedding && embedding instanceof Float32Array) {
                 embeddings.push(embedding);
-            } else {
-                throw new Error(`Failed to get valid embedding for ${imagePath}`);
             }
         } catch (error) {
-            throw new Error(`Error processing ${imagePath}: ${error.message}`);
+            continue;
         }
     }
     
     if (embeddings.length === 0) {
-        throw new Error('No valid embeddings were obtained from any images');
+        throw new Error('All embeddings failed to generate');
     }
     
     return embeddings;
@@ -88,15 +78,14 @@ const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiN2E2MDlkZGM
 
 async function main() {
     try {
-        const embedding = await getEmbedding(imagePath, apiKey, apiEndpoint, true);
+        const embedding = await getEmbedding(imagePath, apiKey, apiEndpoint);
         if (embedding) {
             console.log('Successfully generated embedding:', embedding);
         } else {
-            throw new Error('Failed to generate embedding');
+            console.log('Failed to generate embedding');
         }
     } catch (error) {
         console.error('Error in main:', error);
-        process.exit(1);
     }
 }
 
