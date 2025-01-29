@@ -16,8 +16,15 @@ const createApiCallForm = (imagePath) => {
 }
 
 const createOptions = (apiKey, fileUrl) => {
-  const headers = { accept: "application/json", Authorization: `Bearer ${apiKey}` };
-  const isRemote = (() => { try { return new URL(fileUrl).protocol.startsWith('http') } catch { return false } })();
+  const headers = { 
+    accept: "application/json",
+     Authorization: `Bearer ${apiKey}`
+     };
+  const isRemote = (() => { 
+    try { 
+        return new URL(fileUrl).protocol
+        .startsWith('http') } 
+        catch { return false } })();
   if (isRemote) headers["content-type"] = "application/json";
 
   const body = isRemote
@@ -70,23 +77,3 @@ export const getEmbeddingBatch = async (imagePaths, apiKey, apiEndpoint) => {
     return embeddings;
 }
 
-// Main execution
-const file_url = "https://markusstrasser.org/images/fineart_collage2.jpg";
-const imagePath = '/Users/alien/Projects/embedviz/datasets/ikarus777/best-artworks-of-all-time/versions/1/images/images/Albrecht_Du╠êrer/Albrecht_Du╠êrer_14.jpg';
-const apiEndpoint = 'https://api.edenai.run/v2/image/embeddings';
-const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiN2E2MDlkZGMtOGI3NS00YjUwLTlkNDAtMTA4ZGVkOTRhN2FiIiwidHlwZSI6ImFwaV90b2tlbiJ9.uxHcwdBnWXa2hAvqes8NIN9LyVSmuo87uRAJiJb-OlA';
-
-async function main() {
-    try {
-        const embedding = await getEmbedding(imagePath, apiKey, apiEndpoint);
-        if (embedding) {
-            console.log('Successfully generated embedding:', embedding);
-        } else {
-            console.log('Failed to generate embedding');
-        }
-    } catch (error) {
-        console.error('Error in main:', error);
-    }
-}
-
-main();
