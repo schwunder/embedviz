@@ -42,19 +42,19 @@ export const dimensionalityReduction = (embeddings, pcaObject = null) => {
  * The position of each point is influenced by all other points in the batch.
  * Best for visualization when you want to see how embeddings relate to each other.
  */
-export const dimensionalityReductionBatch = (embeddingsWithIdArray) => {
-  if (!Array.isArray(embeddingsWithIdArray) || embeddingsWithIdArray.length === 0) {
+export const dimensionalityReductionBatch = (embeddingWithIdArray) => {
+  if (!Array.isArray(embeddingWithIdArray) || embeddingWithIdArray.length === 0) {
     throw new TypeError("EmbeddingsWithIdArray must be a non-empty array.");
   }
-  if (embeddingsWithIdArray.some(embedding => !("id" in embedding) || !("embedding" in embedding))) {
+  if (embeddingWithIdArray.some(embedding => !("id" in embedding) || !("embedding" in embedding))) {
     throw new TypeError("EmbeddingsWithIdArray must be an array of objects with 'id' and 'embedding' properties.");
   }
-  if (embeddingsWithIdArray.some(embedding => !(embedding.embedding instanceof Uint8Array))) {
+  if (embeddingWithIdArray.some(embedding => !(embedding.embedding instanceof Uint8Array))) {
     throw new TypeError("Embedding must be a Uint8Array.");
   }
 
   // Convert embeddings to Float32Array format
-  const embeddings = embeddingsWithIdArray.map(({ embedding }) => ({
+  const embeddings = embeddingWithIdArray.map(({ embedding }) => ({
     embedding: new Float32Array(embedding)
   }));
   
@@ -62,7 +62,7 @@ export const dimensionalityReductionBatch = (embeddingsWithIdArray) => {
   const projections = dimensionalityReduction(embeddings);
   
   // Map back to objects with IDs
-  return embeddingsWithIdArray.map(({ id }, index) => ({
+  return embeddingWithIdArray.map(({ id }, index) => ({
     id,
     projection: projections[index]
   }));
@@ -75,19 +75,19 @@ export const dimensionalityReductionBatch = (embeddingsWithIdArray) => {
  * The position of each point is NOT influenced by other embeddings.
  * Best when you want each embedding's position to be completely independent.
  */
-export const dimensionalityReductionLoop = (embeddingsWithIdArray) => {
-  if (!Array.isArray(embeddingsWithIdArray) || embeddingsWithIdArray.length === 0) {
+export const dimensionalityReductionLoop = (embeddingWithIdArray) => {
+  if (!Array.isArray(embeddingWithIdArray) || embeddingWithIdArray.length === 0) {
     throw new TypeError("EmbeddingsWithIdArray must be a non-empty array.");
   }
-  if (embeddingsWithIdArray.some(embedding => !("id" in embedding) || !("embedding" in embedding))) {
+  if (embeddingWithIdArray.some(embedding => !("id" in embedding) || !("embedding" in embedding))) {
     throw new TypeError("EmbeddingsWithIdArray must be an array of objects with 'id' and 'embedding' properties.");
   }
-  if (embeddingsWithIdArray.some(embedding => !(embedding.embedding instanceof Uint8Array))) {
+  if (embeddingWithIdArray.some(embedding => !(embedding.embedding instanceof Uint8Array))) {
     throw new TypeError("Embedding must be a Uint8Array.");
   }
 
   // Process each embedding independently
-  return embeddingsWithIdArray.map(({ id, embedding }) => {
+  return embeddingWithIdArray.map(({ id, embedding }) => {
     const singleEmbedding = [{
       embedding: new Float32Array(embedding)
     }];
