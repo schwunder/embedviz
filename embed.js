@@ -10,7 +10,7 @@ const createApiCallForm = (imagePath) => {
     form.append('show_base_64', 'true');
     form.append('show_original_response', 'false');
     form.append('representation', 'document');
-    form.append('providers', 'google');
+    form.append('providers', 'amazon');
 
     return form;
 }
@@ -34,7 +34,7 @@ const createOptions = (apiKey, fileUrl) => {
         show_base_64: true,
         show_original_response: false,
         representation: "document",
-        providers: ["google"],
+        providers: ["amazon"],
         file_url: fileUrl,
       })
     : createApiCallForm(fileUrl);
@@ -48,7 +48,7 @@ export const getEmbedding = async (fileUrl, apiKey, apiEndpoint) => {
   try {
     const response = await fetch(apiEndpoint, options);
     const data = await response.json();
-    const embedding = data?.google?.items[0]?.embedding;
+    const embedding = data?.amazon?.items[0]?.embedding;
     if (!embedding) throw new Error(`Failed to get valid embedding for ${fileUrl}`);
     return new Float32Array(embedding);
   } catch (error) {
@@ -56,7 +56,7 @@ export const getEmbedding = async (fileUrl, apiKey, apiEndpoint) => {
   }
 }
 
-export const getEmbeddingBatch = async (imagePaths, apiKey, apiEndpoint) => {
+export const getEmbeddingsLoop = async (imagePaths, apiKey, apiEndpoint) => {
     const embeddings = [];
     
     for (const imagePath of imagePaths) {
