@@ -1,22 +1,22 @@
 import fs from 'fs';
 import path from 'path';
 
-const getFilePaths = (folderName, numFiles) => {
+const getFilePaths = (folderName, numFiles = Infinity) => {
     const absoluteFolderPath = path.resolve(folderName);
 
     try {
         const files = fs.readdirSync(absoluteFolderPath);
         const absolutePaths = files.map(file => path.resolve(absoluteFolderPath, file));
-        return absolutePaths.slice(0, numFiles);
+        return numFiles ? absolutePaths.slice(0, numFiles) : absolutePaths;
     } catch (error) {
         throw error;
     }
 };
 
-export const getFilePathsFromMultipleFolders = (folderNames, numFiles) =>
+export const getFilePathsFromMultipleFolders = (folderNames, numFiles = Infinity) =>
     folderNames.map(folderName => getFilePaths(folderName, numFiles)).flat();
 
-export const getFilesFromFolders = (numFolders, numFiles, parentFolder) => {
+export const getFilesFromFolders = (numFolders, numFiles = Infinity, parentFolder) => {
     try {
         const folders = fs.readdirSync(parentFolder).filter(file => fs.statSync(path.join(parentFolder, file)).isDirectory());
         const selectedFolders = folders.slice(0, numFolders);
@@ -29,12 +29,27 @@ export const getFilesFromFolders = (numFolders, numFiles, parentFolder) => {
     }
 };
 
-export const getFilesByArtist = (artistNames, numFiles) => {
-    const parentFolder = 'datasets/ikarus777/best-artworks-of-all-time/versions/1/images/images';
 
-    return artistNames.map(artistName => {
+export const mapArtistToFolderName = (artistName) => {
+    // Special case for Albrecht Dürer
+    if (artistName.toLowerCase().includes('dürer') || artistName.toLowerCase().includes('durer')) {
+      return 'Albrecht_Du╠êrer';
+    }
+    
+    // Replace spaces with underscores, keep hyphens
+    return artistName.replace(/ /g, '_');
+  }
+  
+
+export const getFileAndArtistNames = (artistNames, numFiles = Infinity) => {
+    const parentFolder = 'datasets/ikarus777/best-artworks-of-all-time/versions/1/images/images';
+    const artistFolderNames = artistNames.map(mapArtistToFolderName)
+    return artistFolderNames.flatMap(artistName => {
         const artistFolder = `${parentFolder}/${artistName}`;
-        // Get file paths for the current artist and concatenate them to the result
-        return getFilePathsFromMultipleFolders([artistFolder], numFiles);
-    }).flat();
+        // Get file paths for the current artist and map them to {artistName, fileName}
+        return getFilePathsFromMultipleFolders([artistFolder], numFiles).map(filePath => {
+            const fileName = filePath.split('/').pop();
+            return { artistName, fileName };
+        });
+    });
 };
