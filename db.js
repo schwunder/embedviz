@@ -4,7 +4,7 @@ const db = new Database("embeddings.sqlite");
 
 // Create table if it doesn't exist
 db.query(
-  "CREATE TABLE IF NOT EXISTS embeddings (id INTEGER PRIMARY KEY AUTOINCREMENT, embedding BLOB, projection REAL)"
+  "CREATE TABLE IF NOT EXISTS embeddings (id INTEGER PRIMARY KEY AUTOINCREMENT, artist TEXT, filename TEXT, embedding BLOB, projection REAL)"
 ).run();
 
 const deleteAllEmbeddings = () => {
@@ -24,15 +24,18 @@ const clearEmbedding = (id) => {
 const clearEmbeddingBatch = (ids) => {
   return ids.map(id => clearEmbedding(id));
 };
-
 // store 
-const storeEmbedding = (embedding) => {
-  if (!(embedding instanceof Float32Array)) {
-    throw new Error("Embedding must be a Float32Array");
-  }
+const storeEmbedding = ({ artist, filename, embedding, projection }) => {
   const result = db
-    .query("INSERT INTO embeddings (embedding) VALUES (?) RETURNING id")
-    .get(new Uint8Array(embedding.buffer));
+    .query(
+      "INSERT INTO embeddings (artist, filename, embedding, projection) VALUES (?, ?, ?, ?) RETURNING id"
+    )
+    .get(
+      artist,
+      filename,
+      embedding ? new Uint8Array(embedding.buffer) : null,
+      projection ? projection[0] : null
+    );
   return result.id;
 };
 
@@ -57,7 +60,25 @@ const retrieveEmbeddingBatch = (ids) => {
 
 
 // patch
-const patchEmbedding = (id, projection) => {
+
+// embedding
+const patchWithEmbedding = (id, embedding) => {
+  if (embedding && !(embedding instanceof Float32Array)) {
+    throw new Error("Embedding must be a Float32Array");
+  }
+  db.query("UPDATE embeddings SET embedding = ? WHERE id = ?").run(
+    new Uint8Array(embedding.buffer),
+    id
+  );
+  return id;
+};
+
+const patchWithEmbeddingBatch = (embeddingsWithIdArray) => {
+  return embeddingsWithIdArray.map(({ id, embedding }) => patchWithEmbedding(id, embedding));
+};
+
+// projection
+const patchWithProjection = (id, projection) => {
   if (!Array.isArray(projection) || projection.length !== 2) {
     throw new Error("Projection must be an array with exactly 2 entries");
   }
@@ -68,8 +89,8 @@ const patchEmbedding = (id, projection) => {
   return id;
 };
 
-const patchEmbeddingBatch = (projectionsWithIdArray) => {
-  return projectionsWithIdArray.map(({ id, projection }) => patchEmbedding(id, projection));
+const patchWithProjectionBatch = (projectionsWithIdArray) => {
+  return projectionsWithIdArray.map(({ id, projection }) => patchWithProjection(id, projection));
 };
 
 export { 
@@ -81,6 +102,8 @@ export {
   retrieveEmbeddingBatch,
   clearEmbedding, 
   clearEmbeddingBatch, 
-  patchEmbedding, 
-  patchEmbeddingBatch 
+  patchWithEmbedding, 
+  patchWithEmbeddingBatch, 
+  patchWithProjection, 
+  patchWithProjectionBatch 
 };
