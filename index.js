@@ -3,192 +3,186 @@ import {
   deleteAllEmbeddings,
   getAllEmbeddings,
   storeEmbedding,
-  storeEmbeddingLoop,
-  patchWithEmbedding, 
-  patchWithEmbeddingLoop, 
-  patchWithSingleProjection, 
-  patchWithBatchProjection, 
-  retrieveEmbedding,
-  retrieveFilename,
-  clearEmbeddingLoop
+  patchWithEmbedding,
+  patchWithSingleProjection,
+  clearSingleProjections,
+  clearBatchProjections
 } from "./db.js";
 import { getFilePathsAndArtistNames } from "./paths.js";
-import { dimensionalityReductionLoop } from "./pca.js";
+import { dimensionalityReduction } from "./pca.js";
 import { 
-  analyzeDataRangesByArtist, 
-  printDatabaseAnalysis, 
-  printArtistAnalysis,
-  analyzeFileNumberSequence,
   analyzeDataStatus,
-  analyzeDataRanges
+  printDatabaseStatus
 } from "./log.js";
 
-const API_ENDPOINT = "https://api.edenai.run/v2/image/embeddings";
+// Constants
+const API_URL = "https://api.edenai.run/v2/image/embeddings";
 const artistNames = [
-  "Amedeo Modigliani",
-  "Vasiliy Kandinskiy",
-  "Diego Rivera",
-  "Claude Monet",
-  "Rene Magritte",
-  "Salvador Dali",
-  "Edouard Manet",
-  "Andrei Rublev",
-  "Vincent van Gogh",
-  "Gustav Klimt",
-  "Hieronymus Bosch",
-  "Kazimir Malevich",
-  "Mikhail Vrubel",
-  "Pablo Picasso",
-  "Peter Paul Rubens",
-  "Pierre-Auguste Renoir",
-  "Francisco Goya",
-  "Frida Kahlo",
-  "El Greco",
-  "Albrecht Dürer",
-  "Alfred Sisley",
-  "Pieter Bruegel",
-  "Marc Chagall",
-  "Giotto di Bondone",
-  "Sandro Botticelli",
-  "Caravaggio",
-  "Leonardo da Vinci",
-  "Diego Velazquez",
-  "Henri Matisse",
-  "Jan van Eyck",
-  "Edgar Degas",
-  "Rembrandt",
-  "Titian",
-  "Henri de Toulouse-Lautrec",
-  "Gustave Courbet",
-  "Camille Pissarro",
-  "William Turner",
-  "Edvard Munch",
-  "Paul Cezanne",
-  "Eugene Delacroix",
-  "Henri Rousseau",
-  "Georges Seurat",
-  "Paul Klee",
-  "Piet Mondrian",
-  "Joan Miro",
-  "Andy Warhol",
-  "Paul Gauguin",
-  "Raphael",
-  "Michelangelo",
-  "Jackson Pollock",
+  "Amedeo Modigliani", "Vasiliy Kandinskiy", "Diego Rivera", "Claude Monet",
+  "Rene Magritte", "Salvador Dali", "Edouard Manet", "Andrei Rublev",
+  "Vincent van Gogh", "Gustav Klimt", "Hieronymus Bosch", "Kazimir Malevich",
+  "Mikhail Vrubel", "Pablo Picasso", "Peter Paul Rubens", "Pierre-Auguste Renoir",
+  "Francisco Goya", "Frida Kahlo", "El Greco", "Albrecht Dürer",
+  "Alfred Sisley", "Pieter Bruegel", "Marc Chagall", "Giotto di Bondone",
+  "Sandro Botticelli", "Caravaggio", "Leonardo da Vinci", "Diego Velazquez",
+  "Henri Matisse", "Jan van Eyck", "Edgar Degas", "Rembrandt",
+  "Titian", "Henri de Toulouse-Lautrec", "Gustave Courbet", "Camille Pissarro",
+  "William Turner", "Edvard Munch", "Paul Cezanne", "Eugene Delacroix",
+  "Henri Rousseau", "Georges Seurat", "Paul Klee", "Piet Mondrian",
+  "Joan Miro", "Andy Warhol", "Paul Gauguin", "Raphael",
+  "Michelangelo", "Jackson Pollock"
 ];
+
 
 async function main() {
   const apiKey = process.env.EDEN_API_KEY;
 
+
+  //=============================================================================
+  // SECTION 1: PREPARATION - Path Retrieval and Database Compare
+  //=============================================================================
+
   // Get all available file paths
-  const artistNamesWithFilePaths = getFilePathsAndArtistNames(["Amedeo Modigliani"]);
-  console.log('Total paths from folders:', artistNamesWithFilePaths.length);
-  
-  // Create a map of filename to full path for quick lookup
-  const filePathMap = artistNamesWithFilePaths.reduce((acc, { artistName, filePath }) => {
-    const fileName = filePath.split('/').pop();
-    acc[fileName] = filePath;
+  const artistNamesWithFilePaths = getFilePathsAndArtistNames(artistNames);
+  console.log(`\nTotal paths from folders: ${artistNamesWithFilePaths.length}`);
+
+  // Create a map of filename to file path
+  const filePathMap = artistNamesWithFilePaths.reduce((acc, { filePath }) => {
+    const filename = filePath.split('/').slice(-1)[0];
+    acc[filename] = filePath;
     return acc;
   }, {});
-  
+
+
+
   // Get database entries and find which ones need embeddings
-  const databaseIds = await getAllEmbeddings();
-  console.log('Total database entries:', databaseIds.length);
-
-  // Show database analysis
-  const dbFileNames = databaseIds.map(({ filename }) => filename);
-  const sequenceAnalysis = analyzeFileNumberSequence(dbFileNames);
-  const dataStatus = analyzeDataStatus(databaseIds);
-  const dataRanges = analyzeDataRanges(databaseIds);
+  let existingEntries = await getAllEmbeddings();
   
-  // Print analysis results
-  printDatabaseAnalysis(databaseIds, sequenceAnalysis, dataStatus, dataRanges);
-  const artistAnalysis = analyzeDataRangesByArtist(databaseIds);
-  printArtistAnalysis(artistAnalysis);
+  // Add all files to database
+  for (const [filename, filePath] of Object.entries(filePathMap)) {
+    await storeEmbedding({
+      artist: filename.split('_')[0].replace(/_/g, ' '),
+      filename,
+      embedding: null,
+      projection_single_x: null,
+      projection_single_y: null,
+      projection_batch_x: null,
+      projection_batch_y: null
+    });
+  }
 
-  // Find entries that need embeddings and have corresponding files
-  const entriesToProcess = databaseIds
-    .filter(entry => entry.embedding === null && filePathMap[entry.filename])
-    .map(entry => ({
-      ...entry,
-      filePath: filePathMap[entry.filename]
-    }));
+  // Get updated entries after adding new ones
+  existingEntries = await getAllEmbeddings();
+  let status = analyzeDataStatus(existingEntries);
+  printDatabaseStatus(status);
 
-  console.log(`\nFound ${entriesToProcess.length} entries needing embeddings`);
+  //=============================================================================
+  // SECTION 2: EMBEDDING LOOP - Process and Store Embeddings
+  //=============================================================================
 
-  // Process embeddings one by one
-  if (entriesToProcess.length > 0) {
+  // Process embeddings
+  if (status.withoutEmbeddings > 0) {
     console.log('\nProcessing embeddings...');
     let processedCount = 0;
-    let errorOccurred = false;
+    let count = 0;
 
-    for (const entry of entriesToProcess) {
+    for (const entry of existingEntries.filter(e => !e.embedding)) {
+      if (count >= 2) {
+        console.log('\nStopping after 2 files as requested');
+        break;
+      }
+      count++;
+      
       try {
-        console.log(`Processing ${entry.filename}...`);
+        // Only print status for first iteration, every 50th iteration after first, or last iteration
+        const isFirstIteration = processedCount === 0;
+        const isLastIteration = processedCount === status.withoutEmbeddings - 1;
+        const isFiftiethIteration = processedCount > 0 && processedCount % 50 === 0;
         
-        // Get the embedding using the matched file path
-        const embedding = await getEmbedding(entry.filePath, apiKey, API_ENDPOINT);
-        
-        // Show sample of the embedding (first 2 values)
-        const embeddingSample = Array.from(embedding.slice(0, 2)).map(v => v.toFixed(4));
-        console.log(`Generated embedding sample: [${embeddingSample.join(', ')}...]`);
-        
-        // Update the entry with the embedding
-        await patchWithEmbedding(entry.id, embedding);
+        if (isFirstIteration || isLastIteration || isFiftiethIteration) {
+          console.log(`Processing ${entry.filename}...`);
+          
+          // Get the embedding using the matched file path
+          const filePath = filePathMap[entry.filename];
+          const embedding = await getEmbedding(filePath, apiKey, API_URL);
+          
+          // Show sample of the embedding
+          const embeddingSample = Array.from(embedding.slice(0, 2)).map(v => v.toFixed(4));
+          console.log(`Generated embedding sample: [${embeddingSample}...]`);
+          
+          await patchWithEmbedding(entry.filename, embedding);
+          console.log(`✓ Successfully processed ${entry.filename} (${processedCount + 1}/${status.withoutEmbeddings})`);
+        } else {
+          // Silently process without logging
+          const filePath = filePathMap[entry.filename];
+          const embedding = await getEmbedding(filePath, apiKey, API_URL);
+          await patchWithEmbedding(entry.filename, embedding);
+        }
         
         processedCount++;
-        console.log(`✓ Successfully processed ${entry.filename} (${processedCount}/${entriesToProcess.length})`);
-        
       } catch (error) {
         console.error(`✗ Error processing ${entry.filename}:`, error.message);
-        errorOccurred = true;
+        console.log('\nEmbedding processing stopped due to an error.');
+        console.log(`Successfully processed ${processedCount} files before the error.`);
         break;
       }
     }
 
-    // Final status for embeddings
-    if (errorOccurred) {
-      console.log('\nEmbedding processing stopped due to an error.');
-      console.log(`Successfully processed ${processedCount} files before the error.`);
-    } else {
-      console.log('\nAll embeddings processed successfully!');
-    }
+    console.log('\nAll embeddings processed successfully!');
   }
 
-  // Find entries that need projections
-  const entriesToProject = databaseIds.filter(entry => {
-    return entry.embedding !== null && 
-           (entry.projection_single_x === null || entry.projection_single_y === null);
-  });
+  // Get updated entries after processing embeddings
+  existingEntries = await getAllEmbeddings();
+  status = analyzeDataStatus(existingEntries);
 
-  console.log(`\nFound ${entriesToProject.length} entries needing single projections`);
+  //=============================================================================
+  // SECTION 3: PROJECTION LOOP - Generate and Store Projections
+  //=============================================================================
 
-  // Process projections one by one
-  if (entriesToProject.length > 0) {
+  // Process projections
+  if (status.withEmbeddings > 0) {
     console.log('\nProcessing single projections...');
     let processedCount = 0;
-    let errorOccurred = false;
 
     try {
-      // Prepare data for dimensionalityReductionLoop
-      const embeddingsWithIds = entriesToProject.map(entry => {
-        return {
-          id: entry.id,
-          embedding: entry.embedding
-        };
-      });
+      // Get all entries that have embeddings but no projections
+      const entriesToProject = existingEntries.filter(
+        entry => entry.embedding !== null && 
+                (entry.projection_single_x === null || entry.projection_single_y === null)
+      );
 
-      // Process all projections
-      const projections = await dimensionalityReductionLoop(embeddingsWithIds);
+      const totalToProcess = entriesToProject.length;
 
-      // Update database with projections
-      for (const { id, projection } of projections) {
-        const entry = entriesToProject.find(e => e.id === id);
-        console.log(`✓ Processing ${entry.filename} (${processedCount + 1}/${entriesToProject.length})`);
-        console.log(`  Projection: [${projection[0]}, ${projection[1]}]`);
+      for (const entry of entriesToProject) {
+        // Only print status for first iteration, every 50th iteration after first, or last iteration if after 50th
+        const isFirstIteration = processedCount === 0;
+        const isLastIteration = processedCount === totalToProcess - 1 && processedCount >= 50;
+        const isFiftiethIteration = processedCount > 0 && processedCount % 50 === 0;
         
-        // Update the entry with the projection
-        await patchWithSingleProjection(id, projection);
+        if (isFirstIteration || isLastIteration || isFiftiethIteration) {
+          console.log(`✓ Processing ${entry.filename} (${processedCount + 1}/${totalToProcess})`);
+          
+          // Get projection for this single embedding
+          const points = dimensionalityReduction([{
+            id: entry.id,
+            embedding: entry.embedding
+          }]);
+
+          // The points array contains the projected coordinates
+          const [x, y] = points[0];
+          console.log(`  Projection: [${x}, ${y}]`);
+          
+          // Update the entry with the projection
+          await patchWithSingleProjection(entry.filename, { x, y });
+        } else {
+          // Silently process without logging
+          const points = dimensionalityReduction([{
+            id: entry.id,
+            embedding: entry.embedding
+          }]);
+          const [x, y] = points[0];
+          await patchWithSingleProjection(entry.filename, { x, y });
+        }
         
         processedCount++;
       }
@@ -197,37 +191,13 @@ async function main() {
     } catch (error) {
       console.error(`✗ Error during projection:`, error.message);
       console.log('\nProjection processing stopped due to an error.');
-      console.log(`Successfully processed ${processedCount} projections before the error.`);
-    }
-
-    // Log projections from database
-    console.log('\nProjections in database:');
-    const allEntries = await getAllEmbeddings();
-    for (const entry of allEntries) {
-      console.log(`\n${entry.filename}:`);
-      console.log(`Single projection: x=${entry.projection_single_x}, y=${entry.projection_single_y}`);
     }
   }
 
   // Show final database status
-  console.log('\nFinal database status:');
-  const updatedDatabaseIds = await getAllEmbeddings();
-  const updatedDataStatus = analyzeDataStatus(updatedDatabaseIds);
-  
-  console.log(`- Total entries: ${updatedDatabaseIds.length}`);
-  console.log(`- Entries with embeddings: ${updatedDataStatus.withEmbeddings}`);
-  console.log(`- Entries without embeddings: ${updatedDataStatus.withoutEmbeddings}`);
-  console.log(`- Entries with single projections: ${updatedDataStatus.withSingleProjections}`);
-  console.log(`- Entries without single projections: ${updatedDataStatus.withoutSingleProjections}`);
-  
-  if (updatedDataStatus.withoutEmbeddings > 0) {
-    console.log('\nNext file needing embedding:');
-    console.log(`- ${updatedDataStatus.firstWithoutEmbedding.filename}`);
-  }
-  if (updatedDataStatus.withoutSingleProjections > 0) {
-    console.log('\nNext file needing single projection:');
-    console.log(`- ${updatedDataStatus.firstWithoutSingleProjection.filename}`);
-  }
+  existingEntries = await getAllEmbeddings();
+  status = analyzeDataStatus(existingEntries);
+  printDatabaseStatus(status);
 }
 
 main();
