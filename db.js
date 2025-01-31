@@ -1,23 +1,26 @@
 import { Database } from "bun:sqlite";
 
-const db = new Database("embeddings.sqlite");
+const db = new Database("embeddings.sqlite", { create: true, readwrite: true });
 
-// Create table if it doesn't exist
 db.query(
-  "CREATE TABLE IF NOT EXISTS embeddings (id INTEGER PRIMARY KEY AUTOINCREMENT, artist TEXT, filename TEXT, embedding BLOB, projection_single_x REAL, projection_single_y REAL, projection_batch_x REAL, projection_batch_y REAL)"
+  "CREATE TABLE IF NOT EXISTS embeddings (id INTEGER PRIMARY KEY AUTOINCREMENT, artist TEXT, filename TEXT UNIQUE, embedding BLOB, projection_single_x REAL, projection_single_y REAL, projection_batch_x REAL, projection_batch_y REAL)"
 ).run();
+
+const getAllEmbeddings = () => {
+  const results = db.query("SELECT id, artist, filename, embedding, projection_single_x, projection_single_y, projection_batch_x, projection_batch_y FROM embeddings").all();
+  return results.map(row => ({
+    ...row,
+    hasEmbedding: row.embedding !== null
+  }));
+};
 
 const deleteAllEmbeddings = () => {
   return db.query("DELETE FROM embeddings").run();
 };
 
-const getAllEmbeddings = () => {
-  return db.query("SELECT id, artist, filename, embedding, projection_single_x, projection_single_y, projection_batch_x, projection_batch_y FROM embeddings").all();
-};
-
 // clear
 const clearEmbedding = (id) => {
-  db.query("UPDATE embeddings SET embedding = NULL WHERE id = ?").run(id);
+  db.query("UPDATE embeddings SET embedding = NULL WHERE id = ? OR filename = ?").run(id, id);
   return id;
 };
 
@@ -25,18 +28,36 @@ const clearEmbeddingLoop = (ids) => {
   return ids.map(id => clearEmbedding(id));
 };
 
+// clear projections
+const clearSingleProjections = () => {
+  return db.query("UPDATE embeddings SET projection_single_x = NULL, projection_single_y = NULL").run();
+};
+
+const clearBatchProjections = () => {
+  return db.query("UPDATE embeddings SET projection_batch_x = NULL, projection_batch_y = NULL").run();
+};
+
 // store 
-const storeEmbedding = ({ artist, filename, embedding, projection_single, projection_batch }) => {
+const storeEmbedding = ({ artist, filename, embedding, projection_single_x, projection_single_y, projection_batch_x, projection_batch_y }) => {
   const result = db
-    .query("INSERT INTO embeddings (artist, filename, embedding, projection_single_x, projection_single_y, projection_batch_x, projection_batch_y) VALUES (?, ?, ?, ?, ?, ?, ?)")
+    .query(`INSERT INTO embeddings 
+      (artist, filename, embedding, projection_single_x, projection_single_y, projection_batch_x, projection_batch_y) 
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(filename) DO UPDATE SET
+      artist = excluded.artist,
+      embedding = COALESCE(excluded.embedding, embeddings.embedding),
+      projection_single_x = COALESCE(excluded.projection_single_x, embeddings.projection_single_x),
+      projection_single_y = COALESCE(excluded.projection_single_y, embeddings.projection_single_y),
+      projection_batch_x = COALESCE(excluded.projection_batch_x, embeddings.projection_batch_x),
+      projection_batch_y = COALESCE(excluded.projection_batch_y, embeddings.projection_batch_y)`)
     .run(
-      artist, 
-      filename, 
-      embedding ? new Uint8Array(embedding.buffer) : null, 
-      projection_single ? projection_single[0] : null,
-      projection_single ? projection_single[1] : null,
-      projection_batch ? projection_batch[0] : null,
-      projection_batch ? projection_batch[1] : null
+      artist,
+      filename,
+      embedding ? new Uint8Array(embedding.buffer) : null,
+      projection_single_x,
+      projection_single_y,
+      projection_batch_x,
+      projection_batch_y
     );
   return result.lastInsertRowId;
 };
@@ -45,15 +66,68 @@ const storeEmbeddingLoop = (embeddings) => {
   return embeddings.map(embedding => storeEmbedding(embedding));
 };
 
+// patch
+const patchWithEmbedding = (filename, embedding) => {
+  return storeEmbedding({
+    filename,
+    embedding,
+    artist: null,  // Will keep existing value due to COALESCE
+    projection_single_x: null,
+    projection_single_y: null,
+    projection_batch_x: null,
+    projection_batch_y: null
+  });
+};
+
+const patchWithEmbeddingLoop = (embeddingsWithIdArray) => {
+  return embeddingsWithIdArray.map(({ filename, embedding }) => patchWithEmbedding(filename, embedding));
+};
+
+const patchWithSingleProjection = (filename, projection) => {
+  return storeEmbedding({
+    filename,
+    embedding: null,  // Will keep existing value due to COALESCE
+    artist: null,
+    projection_single_x: projection.x,
+    projection_single_y: projection.y,
+    projection_batch_x: null,
+    projection_batch_y: null
+  });
+};
+
+const patchWithSingleProjectionLoop = (projectionsWithFilenameArray) => {
+  return projectionsWithFilenameArray.map(({ filename, projection }) => 
+    patchWithSingleProjection(filename, projection)
+  );
+};
+
+const patchWithBatchProjection = (filename, projection) => {
+  return storeEmbedding({
+    filename,
+    embedding: null,  // Will keep existing value due to COALESCE
+    artist: null,
+    projection_single_x: null,
+    projection_single_y: null,
+    projection_batch_x: projection.x,
+    projection_batch_y: projection.y
+  });
+};
+
+const patchWithBatchProjectionLoop = (projectionsWithFilenameArray) => {
+  return projectionsWithFilenameArray.map(({ filename, projection }) => 
+    patchWithBatchProjection(filename, projection)
+  );
+};
+
 // retrieve
 const retrieveEmbedding = (id) => {
   const result = db
-    .query("SELECT embedding FROM embeddings WHERE id = ?")
-    .get(id);
+    .query("SELECT embedding FROM embeddings WHERE id = ? OR filename = ?")
+    .get(id, id);
   if (!result?.embedding) {
     return null;
   }
-  return new Float32Array(new Uint8Array(result.embedding).buffer);
+  return new Float32Array(result.embedding);
 };
 
 const retrieveEmbeddingLoop = (ids) => {
@@ -62,8 +136,8 @@ const retrieveEmbeddingLoop = (ids) => {
 
 const retrieveFilename = (id) => {
   const result = db
-    .query("SELECT filename FROM embeddings WHERE id = ?")
-    .get(id);
+    .query("SELECT filename FROM embeddings WHERE id = ? OR filename = ?")
+    .get(id, id);
   if (!result?.filename) {
     return null;
   }
@@ -72,68 +146,6 @@ const retrieveFilename = (id) => {
 
 const retrieveFilenameLoop = (ids) => {
   return ids.map(id => retrieveFilename(id));
-};
-
-// patch
-const patchWithEmbedding = (id, embedding) => {
-  if (embedding && !(embedding instanceof Float32Array)) {
-    throw new Error("Embedding must be a Float32Array");
-  }
-  db.query("UPDATE embeddings SET embedding = ? WHERE id = ?").run(
-    embedding ? new Uint8Array(embedding.buffer) : null,
-    id
-  );
-  return id;
-};
-
-const patchWithEmbeddingLoop = (embeddingsWithIdArray) => {
-  return embeddingsWithIdArray.map(({ id, embedding }) => patchWithEmbedding(id, embedding));
-};
-
-const patchWithSingleProjection = (id, projection) => {
-  return db
-    .query("UPDATE embeddings SET projection_single_x = ?, projection_single_y = ? WHERE id = ?")
-    .run(projection[0], projection[1], id);
-};
-
-const patchWithSingleProjectionLoop = (projectionsWithIdArray) => {
-  return projectionsWithIdArray.map(({ id, projection }) => patchWithSingleProjection(id, projection));
-};
-
-const patchWithBatchProjection = (id, projection) => {
-  return db
-    .query("UPDATE embeddings SET projection_batch_x = ?, projection_batch_y = ? WHERE id = ?")
-    .run(projection[0], projection[1], id);
-};
-
-const patchWithBatchProjectionLoop = (projectionsWithIdArray) => {
-  return projectionsWithIdArray.map(({ id, projection }) => patchWithBatchProjection(id, projection));
-};
-
-const retrieveProjectionType = (id) => {
-  const result = db
-    .query("SELECT projection_type FROM embeddings WHERE id = ?")
-    .get(id);
-  if (!result?.projection_type) {
-    return null;
-  }
-  return result.projection_type;
-};
-
-const retrieveProjectionTypeLoop = (ids) => {
-  return ids.map(id => retrieveProjectionType(id));
-};
-
-const patchWithProjectionType = (id, projection_type) => {
-  db.query("UPDATE embeddings SET projection_type = ? WHERE id = ?").run(
-    projection_type,
-    id
-  );
-  return id;
-};
-
-const patchWithProjectionTypeLoop = (projectionTypesWithIdArray) => {
-  return projectionTypesWithIdArray.map(({ id, projection_type }) => patchWithProjectionType(id, projection_type));
 };
 
 export { 
@@ -153,8 +165,6 @@ export {
   patchWithSingleProjectionLoop,
   patchWithBatchProjection,
   patchWithBatchProjectionLoop,
-  retrieveProjectionType,
-  retrieveProjectionTypeLoop,
-  patchWithProjectionType,
-  patchWithProjectionTypeLoop 
+  clearSingleProjections,
+  clearBatchProjections
 };
