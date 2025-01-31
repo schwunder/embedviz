@@ -137,8 +137,10 @@ function analyzeDataRangesByArtist(databaseIds) {
 
 function analyzeFileNumberSequence(fileNames) {
   const numbers = fileNames
+    .filter(name => name && typeof name === 'string') // Filter out null/undefined values
     .map(name => {
-      const match = name.match(/_(\d+)\./);
+      // Handle both standard pattern and special characters
+      const match = name.match(/[_-](\d+)\./);
       return match ? parseInt(match[1]) : null;
     })
     .filter(num => num !== null)
@@ -171,21 +173,21 @@ function analyzeFileNumberSequence(fileNames) {
 function analyzeDataStatus(databaseIds) {
   const withEmbeddings = databaseIds.filter(item => item.embedding !== null);
   const withoutEmbeddings = databaseIds.filter(item => item.embedding === null);
-  const withSingleProjections = databaseIds.filter(item => item.projection_single !== null);
-  const withoutSingleProjections = databaseIds.filter(item => item.projection_single === null);
-  const withBatchProjections = databaseIds.filter(item => item.projection_batch !== null);
-  const withoutBatchProjections = databaseIds.filter(item => item.projection_batch === null);
+  const withSingleProjections = databaseIds.filter(
+    item => item.projection_single_x !== null && item.projection_single_y !== null
+  );
+  const withoutSingleProjections = databaseIds.filter(
+    item => item.projection_single_x === null || item.projection_single_y === null
+  );
 
   return {
+    totalEntries: databaseIds.length,
     withEmbeddings: withEmbeddings.length,
     withoutEmbeddings: withoutEmbeddings.length,
     withSingleProjections: withSingleProjections.length,
     withoutSingleProjections: withoutSingleProjections.length,
-    withBatchProjections: withBatchProjections.length,
-    withoutBatchProjections: withoutBatchProjections.length,
-    firstWithoutEmbedding: withoutEmbeddings[0],
-    firstWithoutSingleProjection: withoutSingleProjections[0],
-    firstWithoutBatchProjection: withoutBatchProjections[0]
+    nextNeedingEmbedding: withoutEmbeddings[0],
+    nextNeedingSingleProjection: withoutSingleProjections[0]
   };
 }
 
@@ -327,19 +329,14 @@ function printDatabaseAnalysis(databaseIds, sequenceAnalysis, dataStatus, dataRa
   console.log(`- Files without embeddings: ${dataStatus.withoutEmbeddings}`);
   console.log(`- Files with single projections: ${dataStatus.withSingleProjections}`);
   console.log(`- Files without single projections: ${dataStatus.withoutSingleProjections}`);
-  console.log(`- Files with batch projections: ${dataStatus.withBatchProjections}`);
-  console.log(`- Files without batch projections: ${dataStatus.withoutBatchProjections}`);
 
-  if (dataStatus.withoutEmbeddings > 0 || dataStatus.withoutSingleProjections > 0 || dataStatus.withoutBatchProjections > 0) {
+  if (dataStatus.withoutEmbeddings > 0 || dataStatus.withoutSingleProjections > 0) {
     console.log('\nNext Items Needing Processing:');
-    if (dataStatus.firstWithoutEmbedding) {
-      console.log(`- First file needing embedding: ${dataStatus.firstWithoutEmbedding.filename} (${dataStatus.firstWithoutEmbedding.artist})`);
+    if (dataStatus.nextNeedingEmbedding) {
+      console.log(`- First file needing embedding: ${dataStatus.nextNeedingEmbedding.filename} (${dataStatus.nextNeedingEmbedding.artist})`);
     }
-    if (dataStatus.firstWithoutSingleProjection) {
-      console.log(`- First file needing single projection: ${dataStatus.firstWithoutSingleProjection.filename} (${dataStatus.firstWithoutSingleProjection.artist})`);
-    }
-    if (dataStatus.firstWithoutBatchProjection) {
-      console.log(`- First file needing batch projection: ${dataStatus.firstWithoutBatchProjection.filename} (${dataStatus.firstWithoutBatchProjection.artist})`);
+    if (dataStatus.nextNeedingSingleProjection) {
+      console.log(`- First file needing single projection: ${dataStatus.nextNeedingSingleProjection.filename} (${dataStatus.nextNeedingSingleProjection.artist})`);
     }
   }
 
@@ -438,11 +435,21 @@ function printArtistAnalysis(artistAnalysis) {
   });
 }
 
+function printDatabaseStatus(status) {
+  console.log('\nDatabase Status:');
+  console.log(`- Total entries: ${status.totalEntries}`);
+  console.log(`- With embeddings: ${status.withEmbeddings}`);
+  console.log(`- Without embeddings: ${status.withoutEmbeddings}`);
+  console.log(`- With single projections: ${status.withSingleProjections}`);
+  console.log(`- Without single projections: ${status.withoutSingleProjections}`);
+}
+
 export {
   analyzeDataRangesByArtist,
   analyzeFileNumberSequence,
   analyzeDataStatus,
   analyzeDataRanges,
   printDatabaseAnalysis,
-  printArtistAnalysis
+  printArtistAnalysis,
+  printDatabaseStatus
 };
