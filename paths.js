@@ -41,15 +41,12 @@ export const mapArtistToFolderName = (artistName) => {
   }
   
 
-export const getFileAndArtistNames = (artistNames, numFiles = Infinity) => {
+export const getFilePathsAndArtistNames = (artistNames, numFiles = Infinity) => {
     const parentFolder = 'datasets/ikarus777/best-artworks-of-all-time/versions/1/images/images';
-    const artistFolderNames = artistNames.map(mapArtistToFolderName)
-    return artistFolderNames.flatMap(artistName => {
-        const artistFolder = `${parentFolder}/${artistName}`;
-        // Get file paths for the current artist and map them to {artistName, fileName}
-        return getFilePathsFromMultipleFolders([artistFolder], numFiles).map(filePath => {
-            const fileName = filePath.split('/').pop();
-            return { artistName, fileName };
-        });
-    });
+    const artistFolderNames = artistNames.map(mapArtistToFolderName);
+
+    return artistFolderNames.flatMap(artistFolderName => getFilePathsFromMultipleFolders([`${parentFolder}/${artistFolderName}`], numFiles)
+        .map(filePath => ({ artistName: artistFolderName, filePath }))
+    );
 };
+
