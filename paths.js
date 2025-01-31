@@ -31,22 +31,22 @@ export const getFilesFromFolders = (numFolders, numFiles = Infinity, parentFolde
 
 
 export const mapArtistToFolderName = (artistName) => {
-    // Special case for Albrecht Dürer
-    if (artistName.toLowerCase().includes('dürer') || artistName.toLowerCase().includes('durer')) {
-      return 'Albrecht_Du╠êrer';
-    }
-    
-    // Replace spaces with underscores, keep hyphens
-    return artistName.replace(/ /g, '_');
+  // Special case for Albrecht Dürer - use exact folder name from filesystem
+  if (artistName.toLowerCase().includes('dürer')) {
+    return 'Albrecht_Du╠êrer';
   }
+  
+  // Replace spaces with underscores, keep hyphens
+  return artistName.replace(/ /g, '_');
+}
   
 
 export const getFilePathsAndArtistNames = (artistNames, numFiles = Infinity) => {
     const parentFolder = 'datasets/ikarus777/best-artworks-of-all-time/versions/1/images/images';
-    const artistFolderNames = artistNames.map(mapArtistToFolderName);
-
-    return artistFolderNames.flatMap(artistFolderName => getFilePathsFromMultipleFolders([`${parentFolder}/${artistFolderName}`], numFiles)
-        .map(filePath => ({ artistName: artistFolderName, filePath }))
-    );
+    
+    return artistNames.flatMap(artistName => {
+        const artistFolderName = mapArtistToFolderName(artistName);
+        return getFilePathsFromMultipleFolders([`${parentFolder}/${artistFolderName}`], numFiles)
+            .map(filePath => ({ artistName, filePath }));
+    });
 };
-
