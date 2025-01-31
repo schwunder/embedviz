@@ -1,7 +1,7 @@
 import fs from 'fs';
 import axios from 'axios';
 
-const createApiCallForm = (imagePath) => {
+export const createApiCallForm = (imagePath) => {
     const form = new FormData();
     const file = Bun.file(imagePath);
     form.append('file', file);
@@ -15,7 +15,7 @@ const createApiCallForm = (imagePath) => {
     return form;
 }
 
-const createOptions = (apiKey, fileUrl) => {
+export const createOptions = (apiKey, fileUrl) => {
   const headers = { 
     accept: "application/json",
      Authorization: `Bearer ${apiKey}`
@@ -47,12 +47,37 @@ export const getEmbedding = async (fileUrl, apiKey, apiEndpoint) => {
 
   try {
     const response = await fetch(apiEndpoint, options);
-    const data = await response.json();
-    const embedding = data?.amazon?.items[0]?.embedding;
-    if (!embedding) throw new Error(`Failed to get valid embedding for ${fileUrl}`);
+    
+    // Check if response is ok
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`API request failed (${response.status}): ${errorText}`);
+    }
+
+    // Parse JSON and handle parsing errors explicitly
+    let data;
+    try {
+      data = await response.json();
+    } catch (parseError) {
+      throw new Error(`Failed to parse API response: ${parseError.message}`);
+    }
+
+    // Add response logging for debugging
+    if (!data?.amazon?.items?.[0]) {
+      console.error('Unexpected API response structure:', JSON.stringify(data, null, 2));
+      throw new Error(`Invalid API response structure for ${fileUrl}`);
+    }
+
+    const embedding = data.amazon.items[0].embedding;
+    if (!embedding) {
+      console.error('API response missing embedding:', JSON.stringify(data.amazon.items[0], null, 2));
+      throw new Error(`No embedding found in API response for ${fileUrl}`);
+    }
+
     return new Float32Array(embedding);
   } catch (error) {
-    throw error;
+    // Wrap all errors with context
+    throw new Error(`Error processing ${fileUrl}: ${error.message}`);
   }
 }
 
@@ -76,4 +101,3 @@ export const getEmbeddingsLoop = async (imagePaths, apiKey, apiEndpoint) => {
     
     return embeddings;
 }
-
