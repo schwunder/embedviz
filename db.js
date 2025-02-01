@@ -44,7 +44,7 @@ const storeEmbedding = ({ artist, filename, embedding, projection_single_x, proj
       (artist, filename, embedding, projection_single_x, projection_single_y, projection_batch_x, projection_batch_y) 
       VALUES (?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(filename) DO UPDATE SET
-      artist = excluded.artist,
+      artist = COALESCE(excluded.artist, embeddings.artist),
       embedding = COALESCE(excluded.embedding, embeddings.embedding),
       projection_single_x = COALESCE(excluded.projection_single_x, embeddings.projection_single_x),
       projection_single_y = COALESCE(excluded.projection_single_y, embeddings.projection_single_y),
