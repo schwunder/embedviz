@@ -13,10 +13,10 @@ const getFilePaths = (folderName, numFiles = Infinity) => {
     }
 };
 
-export const getFilePathsFromMultipleFolders = (folderNames, numFiles = Infinity) =>
+const getFilePathsFromMultipleFolders = (folderNames, numFiles = Infinity) =>
     folderNames.map(folderName => getFilePaths(folderName, numFiles)).flat();
 
-export const getFilesFromFolders = (numFolders, numFiles = Infinity, parentFolder) => {
+const getFilesFromFolders = (numFolders, numFiles = Infinity, parentFolder) => {
     try {
         const folders = fs.readdirSync(parentFolder).filter(file => fs.statSync(path.join(parentFolder, file)).isDirectory());
         const selectedFolders = folders.slice(0, numFolders);
@@ -30,7 +30,7 @@ export const getFilesFromFolders = (numFolders, numFiles = Infinity, parentFolde
 };
 
 
-export const mapArtistToFolderName = (artistName) => {
+const mapArtistToFolderName = (artistName) => {
   // Special case for Albrecht Dürer - use exact folder name from filesystem
   if (artistName.toLowerCase().includes('dürer')) {
     return 'Albrecht_Du╠êrer';
@@ -41,7 +41,7 @@ export const mapArtistToFolderName = (artistName) => {
 }
   
 
-export const getFilePathsAndArtistNames = (artistNames, numFiles = Infinity) => {
+const getFilePathsAndArtistNames = (artistNames, numFiles = Infinity) => {
     const parentFolder = 'datasets/ikarus777/best-artworks-of-all-time/versions/1/images/images';
     
     return artistNames.flatMap(artistName => {
@@ -49,4 +49,21 @@ export const getFilePathsAndArtistNames = (artistNames, numFiles = Infinity) => 
         return getFilePathsFromMultipleFolders([`${parentFolder}/${artistFolderName}`], numFiles)
             .map(filePath => ({ artistName, filePath }));
     });
+};
+
+const getResizedImagePath = (originalPath) => {
+  // Extract just the filename from the original path
+  const filename = originalPath.split('/').pop();
+  
+  // Replace the path structure to point to the resized directory
+  return originalPath.replace(/\/images\/images\/.*?\//, '/resized/resized/');
+}
+
+export {
+    getFilePaths,
+    getFilesFromFolders,
+    getFilePathsFromMultipleFolders,
+    getFilePathsAndArtistNames,
+    mapArtistToFolderName,
+    getResizedImagePath
 };
