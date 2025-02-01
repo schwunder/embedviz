@@ -10,6 +10,8 @@ datasets/*
 # Dependencies
 node_modules/
 embeddings.sqlite
+embeddings.sqlite.backup.*
+
 # Build outputs
 dist/
 build/
