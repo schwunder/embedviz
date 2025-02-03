@@ -17,15 +17,25 @@
   // Compute extents for x and y to create scales
   const xExtent = d3.extent(points, (d) => d.x);
   const yExtent = d3.extent(points, (d) => d.y);
-  const margin = 40;
+  const margin = 200;  // Increased margin for more spread
 
-  const xScale = d3.scaleLinear().domain(xExtent).range([margin, width - margin]);
+  // Multiply the range by a factor to spread points further apart
+  const spreadFactor = 5;  // Increase this to spread points further
+  width = canvas.width * spreadFactor;
+  height = canvas.height * spreadFactor;
 
-  const yScale = d3.scaleLinear().domain(yExtent).range([height - margin, margin]); // Inverted Y-axis
+  const xScale = d3.scaleLinear()
+    .domain(xExtent)
+    .range([margin, width - margin]);
 
-  // Set thumbnail size
-  const thumbWidth = 50;
-  const thumbHeight = 50;
+  const yScale = d3.scaleLinear()
+    .domain(yExtent)
+    .range([height - margin, margin]); // Inverted Y-axis
+
+  // Set base thumbnail size
+  const baseThumbWidth = 30;   // Smaller base size when zoomed out
+  const baseThumbHeight = 30;
+  const spacing = 300;         // Much larger spacing between points
 
   // Function to preload all images
   function preloadImages() {
@@ -59,14 +69,27 @@
   function draw(transform = d3.zoomIdentity) {
     context.save();
     context.clearRect(0, 0, width, height);
+    
+    // Apply transform for panning and zooming
     context.translate(transform.x, transform.y);
     context.scale(transform.k, transform.k);
 
     points.forEach((point) => {
       const cx = xScale(point.x);
       const cy = yScale(point.y);
+      
       if (point.img) {
-        context.drawImage(point.img, cx - thumbWidth / 2, cy - thumbHeight / 2, thumbWidth, thumbHeight);
+        // Scale thumbnails based on zoom level
+        const scaledWidth = baseThumbWidth * (1 + transform.k * 0.5);
+        const scaledHeight = baseThumbHeight * (1 + transform.k * 0.5);
+        
+        context.drawImage(
+          point.img,
+          cx - scaledWidth / 2,
+          cy - scaledHeight / 2,
+          scaledWidth,
+          scaledHeight
+        );
       }
     });
 
@@ -76,9 +99,9 @@
   // Initial zoom transform
   let currentTransform = d3.zoomIdentity;
 
-  // Setup d3 zoom behavior
+  // Setup d3 zoom behavior with wider zoom range
   const zoom = d3.zoom()
-    .scaleExtent([0.5, 20])
+    .scaleExtent([0.1, 50])  // Allow zooming out further and in closer
     .on("zoom", (event) => {
       currentTransform = event.transform;
       draw(currentTransform);
@@ -88,10 +111,10 @@
 
   // Handle window resize
   window.addEventListener("resize", () => {
-    width = canvas.width = window.innerWidth;
-    height = canvas.height = window.innerHeight;
-    xScale.range([margin, width - margin]);
-    yScale.range([height - margin, margin]);
+    const newWidth = window.innerWidth * spreadFactor;
+    const newHeight = window.innerHeight * spreadFactor;
+    xScale.range([margin, newWidth - margin]);
+    yScale.range([newHeight - margin, margin]);
     draw(currentTransform);
   });
 
