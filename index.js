@@ -1,8 +1,10 @@
 import { 
   getAllEmbeddings,
   retrieveEmbedding,
+  retrieveFullEntry,
   patchWithSingleProjection,
   patchWithBatchProjection,
+  patchWithBatchProjectionById,
   clearSingleProjections,
   clearBatchProjections
 } from "./db.js";
@@ -11,6 +13,7 @@ import { dimensionalityReductionBatch } from "./pca.js";
 
 
 async function main() {
+
   const validEmbeddings = getAllEmbeddings()
   .filter(row => row.hasEmbedding)
   .map(row => ({
@@ -21,9 +24,9 @@ async function main() {
   const batchProjections = dimensionalityReductionBatch(validEmbeddings);
   console.log(batchProjections);
   batchProjections.forEach(projection => {
-    patchWithBatchProjection(projection.id, projection.projection);
+    patchWithBatchProjectionById(projection.id, projection.projection[0], projection.projection[1]);
   });
-  const oneProjection = retrieveEmbedding(batchProjections[0].id);
+  const oneProjection = retrieveFullEntry(batchProjections[0].id);
   console.log(oneProjection);
 
 }

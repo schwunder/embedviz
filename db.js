@@ -38,9 +38,30 @@ const clearBatchProjections = () => {
 };
 
 // store 
-const storeEmbedding = ({ artist, filename, embedding, projection_single_x, projection_single_y, projection_batch_x, projection_batch_y }) => {
-  const result = db
-    .query(`INSERT INTO embeddings 
+const storeEmbedding = ({ id, artist, filename, embedding, projection_single_x, projection_single_y, projection_batch_x, projection_batch_y }) => {
+  let query;
+  let params;
+  
+  if (id) {
+    query = `UPDATE embeddings SET
+      artist = COALESCE(?, embeddings.artist),
+      embedding = COALESCE(?, embeddings.embedding),
+      projection_single_x = COALESCE(?, embeddings.projection_single_x),
+      projection_single_y = COALESCE(?, embeddings.projection_single_y),
+      projection_batch_x = COALESCE(?, embeddings.projection_batch_x),
+      projection_batch_y = COALESCE(?, embeddings.projection_batch_y)
+      WHERE id = ?`;
+    params = [
+      artist,
+      embedding ? new Uint8Array(embedding.buffer) : null,
+      projection_single_x,
+      projection_single_y,
+      projection_batch_x,
+      projection_batch_y,
+      id
+    ];
+  } else {
+    query = `INSERT INTO embeddings 
       (artist, filename, embedding, projection_single_x, projection_single_y, projection_batch_x, projection_batch_y) 
       VALUES (?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(filename) DO UPDATE SET
@@ -49,8 +70,8 @@ const storeEmbedding = ({ artist, filename, embedding, projection_single_x, proj
       projection_single_x = COALESCE(excluded.projection_single_x, embeddings.projection_single_x),
       projection_single_y = COALESCE(excluded.projection_single_y, embeddings.projection_single_y),
       projection_batch_x = COALESCE(excluded.projection_batch_x, embeddings.projection_batch_x),
-      projection_batch_y = COALESCE(excluded.projection_batch_y, embeddings.projection_batch_y)`)
-    .run(
+      projection_batch_y = COALESCE(excluded.projection_batch_y, embeddings.projection_batch_y)`;
+    params = [
       artist,
       filename,
       embedding ? new Uint8Array(embedding.buffer) : null,
@@ -58,7 +79,10 @@ const storeEmbedding = ({ artist, filename, embedding, projection_single_x, proj
       projection_single_y,
       projection_batch_x,
       projection_batch_y
-    );
+    ];
+  }
+  
+  const result = db.query(query).run(...params);
   return result.lastInsertRowId;
 };
 
@@ -113,6 +137,18 @@ const patchWithBatchProjection = (filename, projection) => {
   });
 };
 
+const patchWithBatchProjectionById = (id, projection_x, projection_y) => {
+  return storeEmbedding({
+    id,
+    artist: null,
+    embedding: null,
+    projection_single_x: null,
+    projection_single_y: null,
+    projection_batch_x: projection_x,
+    projection_batch_y: projection_y
+  });
+};
+
 const patchWithBatchProjectionLoop = (projectionsWithFilenameArray) => {
   return projectionsWithFilenameArray.map(({ filename, projection }) => 
     patchWithBatchProjection(filename, projection)
@@ -128,6 +164,16 @@ const retrieveEmbedding = (id) => {
     return null;
   }
   return new Float32Array(result.embedding);
+};
+
+const retrieveFullEntry = (id) => {
+  const result = db
+    .query("SELECT * FROM embeddings WHERE id = ? OR filename = ?")
+    .get(id, id);
+  if (!result) {
+    return null;
+  }
+  return result;
 };
 
 const retrieveEmbeddingLoop = (ids) => {
@@ -153,6 +199,7 @@ export {
   deleteAllEmbeddings,
   storeEmbedding, 
   storeEmbeddingLoop,
+  retrieveFullEntry,
   retrieveEmbedding,
   retrieveEmbeddingLoop,
   retrieveFilename,
@@ -165,6 +212,7 @@ export {
   patchWithSingleProjectionLoop,
   patchWithBatchProjection,
   patchWithBatchProjectionLoop,
+  patchWithBatchProjectionById,
   clearSingleProjections,
   clearBatchProjections
 };
