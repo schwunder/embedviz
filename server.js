@@ -11,7 +11,7 @@ const apiHandler = async (req) => {
     const points = all
       .filter(row => row.projection_batch_x !== null && row.projection_batch_y !== null)
       .map(row => ({
-        id: row.id,
+        filename: row.filename,
         x: row.projection_batch_x,
         y: row.projection_batch_y
       }));

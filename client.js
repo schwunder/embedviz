@@ -39,10 +39,7 @@
         points.forEach(point => {
           const cx = xScale(point.x);
           const cy = yScale(point.y);
-          context.beginPath();
-          context.arc(cx, cy, 1, 0, 2 * Math.PI);  // Smaller dots
-          context.fillStyle = "rgba(255, 0, 0, 0.5)";  // Transparency
-          context.fill();
+          context.fillText(`thumbnails/${point.filename}`, cx + 3, cy + 3);
         });
       
         context.restore();
