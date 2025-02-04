@@ -17,10 +17,10 @@
   // Compute extents for x and y to create scales
   const xExtent = d3.extent(points, (d) => d.x);
   const yExtent = d3.extent(points, (d) => d.y);
-  const margin = 200;  // Increased margin for more spread
+  const margin = 500;  // Much larger margin
 
-  // Multiply the range by a factor to spread points further apart
-  const spreadFactor = 5;  // Increase this to spread points further
+  // Multiply the range by a factor to spread points much further apart
+  const spreadFactor = 15;  // Dramatically increased spread
   width = canvas.width * spreadFactor;
   height = canvas.height * spreadFactor;
 
@@ -33,9 +33,9 @@
     .range([height - margin, margin]); // Inverted Y-axis
 
   // Set base thumbnail size
-  const baseThumbWidth = 30;   // Smaller base size when zoomed out
-  const baseThumbHeight = 30;
-  const spacing = 300;         // Much larger spacing between points
+  const baseThumbWidth = 20;   // Even smaller base size when zoomed out
+  const baseThumbHeight = 20;
+  const spacing = 800;         // Much larger spacing between points
 
   // Function to preload all images
   function preloadImages() {
@@ -101,7 +101,7 @@
 
   // Setup d3 zoom behavior with wider zoom range
   const zoom = d3.zoom()
-    .scaleExtent([0.1, 50])  // Allow zooming out further and in closer
+    .scaleExtent([0.05, 50])  // Allow zooming out even further
     .on("zoom", (event) => {
       currentTransform = event.transform;
       draw(currentTransform);
