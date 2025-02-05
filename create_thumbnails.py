@@ -1,38 +1,52 @@
 from PIL import Image
-import os
 from pathlib import Path
+import subprocess
 
 # Source and destination directories
-source_dir = Path('/Users/alien/Projects/embedviznewtwo/datasets/ikarus777/best-artworks-of-all-time/versions/1/resized/resized')
+source_dir = Path('/Users/alien/Projects/embedviznewtwo/datasets/ikarus777/best-artworks-of-all-time/versions/1/images/images')
 thumbnail_dir = Path('/Users/alien/Projects/embedviznewtwo/thumbnails')
 
 # Create thumbnails directory if it doesn't exist
 thumbnail_dir.mkdir(exist_ok=True)
 
 # Target size for thumbnails
-THUMBNAIL_SIZE = (50, 50)
+THUMBNAIL_SIZE = '75x75'
 
 def create_thumbnail(image_path):
     try:
-        with Image.open(image_path) as img:
-            # Convert to RGB if necessary
-            if img.mode in ('RGBA', 'P'):
-                img = img.convert('RGB')
-            
-            # Create thumbnail while maintaining aspect ratio
-            img.thumbnail(THUMBNAIL_SIZE, Image.Resampling.LANCZOS)
-            
-            # Save to new directory with same filename
-            output_path = thumbnail_dir / image_path.name
-            img.save(output_path, "JPEG", quality=85)
-            return True
+        # Prepare output path
+        output_path = thumbnail_dir / image_path.stem
+        output_path = output_path.with_suffix('.avif')
+        
+        # Use ImageMagick to convert and resize with high quality settings
+        cmd = [
+            'convert',
+            str(image_path),
+            '-resize', f'{THUMBNAIL_SIZE}^',  # Resize to fill the dimensions
+            '-gravity', 'center',  # Center the image
+            '-extent', THUMBNAIL_SIZE,  # Crop to exact size
+            '-quality', '100',  # Maximum quality
+            '-define', 'heic:speed=1',  # Highest quality encoding
+            '-define', 'heic:compression-level=9',  # Maximum compression
+            '-define', 'heic:color-profile=1',  # Preserve color profile
+            '-define', 'heic:preserve-orientation=1',  # Preserve orientation
+            '-sampling-factor', '4:4:4',  # No chroma subsampling
+            str(output_path)
+        ]
+        
+        # Run the conversion command
+        subprocess.run(cmd, check=True, capture_output=True)
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"Error processing {image_path.name}: {e.stderr}")
+        return False
     except Exception as e:
         print(f"Error processing {image_path.name}: {e}")
         return False
 
 def main():
-    # Get all jpg files
-    jpg_files = list(source_dir.glob('*.jpg'))
+    # Get all jpg files recursively from artist directories
+    jpg_files = list(source_dir.glob('**/*.jpg'))
     total_files = len(jpg_files)
     
     print(f"Found {total_files} JPG files to process")

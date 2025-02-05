@@ -1,1 +1,2 @@
 Pillow>=10.0.0
+aioavif>=1.0.0
